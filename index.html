@@ -18,6 +18,7 @@
   --red: #f87171;
   --amber: #fbbf24;
   --blue: #60a5fa;
+  --purple: #a78bfa;
   --q3: #60a5fa;
   --q4: #a78bfa;
   --q1: #34d399;
@@ -58,6 +59,35 @@ h1 { font-size:24px; font-weight:700; letter-spacing:-0.5px; }
 .chart-bar { width:100%; border-radius:8px 8px 0 0; transition:height 0.6s ease; }
 .chart-labels { display:flex; gap:16px; }
 .chart-labels span { flex:1; text-align:center; font-size:11px; font-weight:600; color:var(--text-muted); }
+
+/* AI Insights */
+.insights-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; margin-bottom:24px; overflow:hidden; }
+.insights-header { display:flex; justify-content:space-between; align-items:center; padding:16px 24px; cursor:pointer; user-select:none; }
+.insights-header:hover { background:var(--surface-hover); }
+.insights-title { display:flex; align-items:center; gap:10px; }
+.insights-title .icon { width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg, rgba(167,139,250,0.2), rgba(96,165,250,0.2)); display:flex; align-items:center; justify-content:center; font-size:14px; }
+.insights-title h3 { font-size:13px; font-weight:700; letter-spacing:-0.2px; }
+.insights-title .powered { font-size:10px; color:var(--text-dim); font-weight:500; }
+.insights-toggle { font-size:18px; color:var(--text-dim); transition:transform 0.3s; }
+.insights-toggle.open { transform:rotate(180deg); }
+.insights-body { padding:0 24px 20px; display:none; }
+.insights-body.open { display:block; }
+.insights-loading { display:flex; align-items:center; gap:10px; padding:16px 0; color:var(--text-muted); font-size:13px; }
+.insights-loading .spinner { width:16px; height:16px; border:2px solid var(--border); border-top:2px solid var(--purple); border-radius:50%; animation:spin 0.8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.insights-error { color:var(--red); font-size:12px; padding:8px 0; }
+.insight-list { list-style:none; display:flex; flex-direction:column; gap:12px; }
+.insight-item { display:flex; gap:12px; align-items:flex-start; padding:12px 16px; background:rgba(255,255,255,0.02); border-radius:8px; border:1px solid rgba(255,255,255,0.04); }
+.insight-icon { width:24px; height:24px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:12px; flex-shrink:0; margin-top:1px; }
+.insight-icon.risk { background:rgba(248,113,113,0.15); }
+.insight-icon.opp { background:rgba(52,211,153,0.15); }
+.insight-icon.trend { background:rgba(96,165,250,0.15); }
+.insight-icon.watch { background:rgba(251,191,36,0.15); }
+.insight-icon.info { background:rgba(167,139,250,0.15); }
+.insight-text { font-size:13px; line-height:1.5; color:var(--text-muted); }
+.insight-text strong { color:var(--text); font-weight:600; }
+.insights-refresh { display:inline-flex; align-items:center; gap:6px; margin-top:12px; background:transparent; border:1px solid var(--border); color:var(--text-dim); padding:5px 12px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all 0.15s; }
+.insights-refresh:hover { border-color:rgba(255,255,255,0.2); color:var(--text-muted); }
 
 .filters-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px; }
 .filter-group { display:flex; gap:6px; align-items:center; }
@@ -146,6 +176,9 @@ h1 { font-size:24px; font-weight:700; letter-spacing:-0.5px; }
 <script>
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSIiOf5lYvr2kIR6aBr1ASJvEQBc-L6lMTUsx5iqznCSkh0Jlr3FOdJNt_DIPvlTpV0es1OdFBZ82V2/pub?gid=0&single=true&output=csv";
 
+// ⚡ CHANGE THIS to your Cloudflare Worker URL after deploying
+const WORKER_URL = "https://neovolta-insights.jane-johnson.workers.dev/";
+
 let STATE = {
   data: [],
   filtered: [],
@@ -154,6 +187,10 @@ let STATE = {
   typeFilter: "all",
   sortBy: "risk",
   lastUpdated: "",
+  insightsOpen: true,
+  insightsHTML: null,
+  insightsLoading: false,
+  insightsError: null,
 };
 
 function parseCSV(text) {
@@ -185,17 +222,9 @@ function parseCSV(text) {
 
 function parseDate(val) {
   if (!val) return null;
-  // Handle epoch milliseconds
   const num = Number(val);
-  if (num > 1000000000000) {
-    const d = new Date(num);
-    return d.toISOString().split("T")[0];
-  }
-  if (num > 1000000000) {
-    const d = new Date(num * 1000);
-    return d.toISOString().split("T")[0];
-  }
-  // Handle date strings
+  if (num > 1000000000000) { return new Date(num).toISOString().split("T")[0]; }
+  if (num > 1000000000) { return new Date(num * 1000).toISOString().split("T")[0]; }
   if (val.includes("-") || val.includes("/")) return val.split(" ")[0];
   return null;
 }
@@ -234,6 +263,127 @@ function fmtDate(d) {
   if (!d) return "—";
   return new Date(d + "T00:00:00").toLocaleDateString("en-US", {month:"short",day:"numeric"});
 }
+
+// ===== AI INSIGHTS =====
+
+function buildInsightsPrompt(data) {
+  const filtered = data.filter(r => r.q3 + r.q4 + r.q1 >= 1000);
+  const tQ3 = filtered.reduce((s,d)=>s+d.q3,0);
+  const tQ4 = filtered.reduce((s,d)=>s+d.q4,0);
+  const tQ1 = filtered.reduce((s,d)=>s+d.q1,0);
+  const atRisk = filtered.filter(d => getSignal(d).type === "danger");
+  const expected = filtered.filter(d => getSignal(d).type === "expected");
+  const healthy = filtered.filter(d => getSignal(d).type === "healthy");
+
+  const companyLines = filtered.map(d => {
+    const sig = getSignal(d);
+    return `${d.company} | Type: ${d.type} | Q3: $${d.q3.toLocaleString()} | Q4: $${d.q4.toLocaleString()} | Q1: $${d.q1.toLocaleString()} | Signal: ${sig.type} | Recent Deal: ${d.dealAmt > 0 ? '$'+d.dealAmt.toLocaleString() : 'none'} | Last Close: ${d.lastClose || 'none'} | Open Deals: ${d.openDeals}`;
+  }).join("\n");
+
+  return `You are analyzing quarterly invoice data for Neovolta, a solar energy storage company, to help their VP of Sales identify account risks and opportunities. The data covers Q3 2025, Q4 2025, and Q1 2026 (current quarter, still in progress — we are in mid-February 2026).
+
+Summary:
+- Total accounts (over $1K threshold): ${filtered.length}
+- Total Q3 2025: $${tQ3.toLocaleString()}
+- Total Q4 2025: $${tQ4.toLocaleString()}  
+- Total Q1 2026: $${tQ1.toLocaleString()} (quarter still in progress)
+- At Risk (declining, no deal activity): ${atRisk.length} accounts
+- Invoice Expected (declining but deal activity present): ${expected.length} accounts
+- Healthy (stable/growing): ${healthy.length} accounts
+- Distributors: ${filtered.filter(d=>d.type==='Distributor').length} | Installers: ${filtered.filter(d=>d.type==='Installer').length}
+
+Company-level data:
+${companyLines}
+
+Provide exactly 5 insights as a JSON array. Each insight object must have:
+- "icon": one of "risk", "opp", "trend", "watch", "info"  
+- "text": the insight (use <strong> tags around company names and dollar amounts, 1-2 sentences max)
+
+Focus on:
+1. The single biggest revenue risk right now — name the account and the dollar impact
+2. Distributor vs installer channel patterns worth noting
+3. Accounts with promising signals (recent deals, new revenue appearing)
+4. A pattern or concentration risk the VP should be aware of
+5. One specific, actionable next step
+
+Be direct. Use actual company names and dollar figures. Don't hedge or be generic. Remember Q1 is mid-quarter so low Q1 numbers are expected — focus on accounts with ZERO deal pipeline as the real concerns.
+
+Respond with ONLY the JSON array, no markdown, no backticks, no other text.`;
+}
+
+async function fetchInsights(data) {
+  STATE.insightsLoading = true;
+  STATE.insightsError = null;
+  STATE.insightsHTML = null;
+  renderInsightsPanel();
+
+  try {
+    const response = await fetch(WORKER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        messages: [{ role: "user", content: buildInsightsPrompt(data) }]
+      })
+    });
+
+    if (!response.ok) {
+      const errBody = await response.text();
+      throw new Error(`API returned ${response.status}`);
+    }
+
+    const result = await response.json();
+    const text = result.content.map(c => c.text || "").join("");
+    
+    const cleaned = text.replace(/```json|```/g, "").trim();
+    const insights = JSON.parse(cleaned);
+
+    const iconEmoji = { risk: "🔴", opp: "🟢", trend: "📊", watch: "🟡", info: "💡" };
+
+    STATE.insightsHTML = `<ul class="insight-list">${insights.map(ins => `
+      <li class="insight-item">
+        <div class="insight-icon ${ins.icon}">${iconEmoji[ins.icon] || "💡"}</div>
+        <div class="insight-text">${ins.text}</div>
+      </li>
+    `).join("")}</ul>
+    <button class="insights-refresh" onclick="refreshInsights()">↻ Regenerate insights</button>`;
+
+  } catch (err) {
+    console.error("Insights error:", err);
+    STATE.insightsError = "Could not generate insights — " + err.message;
+  }
+
+  STATE.insightsLoading = false;
+  renderInsightsPanel();
+}
+
+function refreshInsights() {
+  fetchInsights(STATE.data);
+}
+
+function renderInsightsPanel() {
+  const body = document.getElementById("insights-body");
+  if (!body) return;
+
+  if (STATE.insightsLoading) {
+    body.innerHTML = `<div class="insights-loading"><div class="spinner"></div>Analyzing ${STATE.data.filter(r=>r.q3+r.q4+r.q1>=1000).length} accounts with AI...</div>`;
+  } else if (STATE.insightsError) {
+    body.innerHTML = `<div class="insights-error">${STATE.insightsError}</div><button class="insights-refresh" onclick="refreshInsights()">↻ Try again</button>`;
+  } else if (STATE.insightsHTML) {
+    body.innerHTML = STATE.insightsHTML;
+  }
+}
+
+function toggleInsights() {
+  STATE.insightsOpen = !STATE.insightsOpen;
+  const body = document.getElementById("insights-body");
+  const toggle = document.getElementById("insights-toggle");
+  if (body) body.className = STATE.insightsOpen ? "insights-body open" : "insights-body";
+  if (toggle) toggle.className = STATE.insightsOpen ? "insights-toggle open" : "insights-toggle";
+}
+
+// ===== FILTERS & SORTING =====
 
 function applyFilters() {
   let d = STATE.data.filter(r => r.q3 + r.q4 + r.q1 >= 1000);
@@ -401,6 +551,22 @@ function render() {
       ${totalChartHTML(d)}
     </div>
 
+    <div class="insights-card">
+      <div class="insights-header" onclick="toggleInsights()">
+        <div class="insights-title">
+          <div class="icon">✦</div>
+          <div>
+            <h3>AI Insights</h3>
+            <span class="powered">Powered by Claude</span>
+          </div>
+        </div>
+        <span id="insights-toggle" class="insights-toggle${STATE.insightsOpen?' open':''}">▾</span>
+      </div>
+      <div id="insights-body" class="insights-body${STATE.insightsOpen?' open':''}">
+        ${STATE.insightsHTML || (STATE.insightsLoading ? '<div class="insights-loading"><div class="spinner"></div>Analyzing accounts with AI...</div>' : STATE.insightsError ? `<div class="insights-error">${STATE.insightsError}</div>` : '')}
+      </div>
+    </div>
+
     <div class="filters-row">
       <div class="filter-group">
         <span class="filter-label">TYPE:</span>
@@ -445,7 +611,7 @@ function setFilter(f) { STATE.filter = f; STATE.selected = null; render(); }
 function setTypeFilter(f) { STATE.typeFilter = f; STATE.selected = null; render(); }
 function setSort(s) { STATE.sortBy = s; render(); }
 
-// Load data
+// Load data then generate insights
 fetch(SHEET_URL)
   .then(r => r.text())
   .then(text => {
@@ -453,6 +619,8 @@ fetch(SHEET_URL)
     STATE.data = parseSheetData(rows);
     STATE.lastUpdated = new Date().toLocaleDateString("en-US", {month:"short",day:"numeric",year:"numeric"});
     render();
+    // Fire off AI insights after initial render so the dashboard appears immediately
+    fetchInsights(STATE.data);
   })
   .catch(err => {
     document.getElementById("app").innerHTML = `
