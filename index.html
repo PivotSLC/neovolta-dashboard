@@ -169,9 +169,9 @@ h1 { font-size:24px; font-weight:700; letter-spacing:-0.5px; }
 .footer { text-align:center; padding:24px 0 8px; font-size:10px; color:var(--text-dim); }
 .footer a { color:var(--text-muted); text-decoration:underline; }
 
-.theme-toggle { position:fixed; top:80px; right:32px; z-index:100; width:40px; height:40px; background:var(--surface); border:1px solid var(--border); border-radius:50%; padding:0; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; }
+.theme-toggle { background:var(--surface); border:1px solid var(--border); border-radius:50%; width:36px; height:36px; padding:0; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; flex-shrink:0; }
 .theme-toggle:hover { border-color:var(--text-muted); }
-.theme-toggle svg { width:20px; height:20px; stroke:var(--text-muted); fill:none; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+.theme-toggle svg { width:18px; height:18px; stroke:var(--text-muted); fill:none; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
 [data-theme="light"] .insight-item { background:rgba(0,0,0,0.02); border-color:rgba(0,0,0,0.06); }
 [data-theme="light"] .insights-refresh:hover { border-color:rgba(0,0,0,0.2); }
 [data-theme="light"] .btn:hover { border-color:rgba(0,0,0,0.2); }
@@ -203,29 +203,26 @@ h1 { font-size:24px; font-weight:700; letter-spacing:-0.5px; }
   <p>Fetching data from Google Sheets</p>
 </div>
 
-<button class="theme-toggle" onclick="toggleTheme()" id="theme-toggle-btn">
-  <svg id="theme-icon-sun" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-  <svg id="theme-icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-</button>
-
 <script>
 function toggleTheme() {
   const html = document.documentElement;
   const isDark = html.getAttribute('data-theme') !== 'light';
   html.setAttribute('data-theme', isDark ? 'light' : 'dark');
-  document.getElementById('theme-icon-sun').style.display = isDark ? 'block' : 'none';
-  document.getElementById('theme-icon-moon').style.display = isDark ? 'none' : 'block';
   localStorage.setItem('neovolta-theme', isDark ? 'light' : 'dark');
+  updateThemeIcons();
+}
+function updateThemeIcons() {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  const sun = document.getElementById('theme-icon-sun');
+  const moon = document.getElementById('theme-icon-moon');
+  if (sun) sun.style.display = isLight ? 'block' : 'none';
+  if (moon) moon.style.display = isLight ? 'none' : 'block';
 }
 // Restore saved preference
 (function() {
   const saved = localStorage.getItem('neovolta-theme');
   if (saved === 'light') {
     document.documentElement.setAttribute('data-theme', 'light');
-    document.addEventListener('DOMContentLoaded', function() {
-      document.getElementById('theme-icon-sun').style.display = 'block';
-      document.getElementById('theme-icon-moon').style.display = 'none';
-    });
   }
 })();
 
@@ -590,7 +587,13 @@ function render() {
     <div class="header">
       <div class="header-top">
         <span class="logo">Neovolta</span>
-        <span class="date-badge"><span class="dot">●</span>Last Updated: ${STATE.lastUpdated}</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="date-badge"><span class="dot">●</span>Last Updated: ${STATE.lastUpdated}</span>
+          <button class="theme-toggle" onclick="toggleTheme()">
+            <svg id="theme-icon-sun" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+            <svg id="theme-icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          </button>
+        </div>
       </div>
       <h1>Quarterly Invoice Trends</h1>
       <p class="subtitle">Q1 FY26 → Q2 FY26 → Q3 FY26 · Accounts under $1K excluded</p>
@@ -656,6 +659,7 @@ function render() {
       Data from HubSpot · Invoices synced since Q1 FY26 (Jul 2025) · Prepared by <a href="https://pivotslc.com" target="_blank">Pivot</a>
     </div>
   `;
+  updateThemeIcons();
 }
 
 function selectCompany(name) {
