@@ -234,9 +234,9 @@ function parseSheetData(rows) {
     id: r["Record ID"] || "",
     company: r["Company Name"] || "",
     type: (r["Company Type"] || "Installer").trim(),
-    q3: parseFloat(r["Invoiced Q3 2025"]) || 0,
-    q4: parseFloat(r["Invoiced Q4 2025"]) || 0,
-    q1: parseFloat(r["Invoiced Q1 2026"]) || 0,
+    q3: parseFloat(r["Invoiced Q1 FY26"]) || 0,
+    q4: parseFloat(r["Invoiced Q2 FY26"]) || 0,
+    q1: parseFloat(r["Invoiced Q3 FY26"]) || 0,
     dealAmt: parseFloat(r["Recent Deal Amount"]) || 0,
     lastClose: parseDate(r["Recent Deal Close Date"]),
     openDeals: parseInt(r["Number of Open Deals"]) || 0,
@@ -277,16 +277,16 @@ function buildInsightsPrompt(data) {
 
   const companyLines = filtered.map(d => {
     const sig = getSignal(d);
-    return `${d.company} | Type: ${d.type} | Q3: $${d.q3.toLocaleString()} | Q4: $${d.q4.toLocaleString()} | Q1: $${d.q1.toLocaleString()} | Signal: ${sig.type} | Recent Deal: ${d.dealAmt > 0 ? '$'+d.dealAmt.toLocaleString() : 'none'} | Last Close: ${d.lastClose || 'none'} | Open Deals: ${d.openDeals}`;
+    return `${d.company} | Type: ${d.type} | Q1 FY26: $${d.q3.toLocaleString()} | Q2 FY26: $${d.q4.toLocaleString()} | Q3 FY26: $${d.q1.toLocaleString()} | Signal: ${sig.type} | Recent Deal: ${d.dealAmt > 0 ? '$'+d.dealAmt.toLocaleString() : 'none'} | Last Close: ${d.lastClose || 'none'} | Open Deals: ${d.openDeals}`;
   }).join("\n");
 
-  return `You are analyzing quarterly invoice data for Neovolta, a solar energy storage company, to help their VP of Sales identify account risks and opportunities. The data covers Q3 2025, Q4 2025, and Q1 2026 (current quarter, still in progress — we are in mid-February 2026).
+  return `You are analyzing quarterly invoice data for Neovolta, a solar energy storage company, to help their VP of Sales identify account risks and opportunities. The data covers Q1 FY26, Q2 FY26, and Q3 FY26 (current quarter, still in progress — we are in early March 2026). NeoVolta fiscal year runs July 1 - June 30.
 
 Summary:
 - Total accounts (over $1K threshold): ${filtered.length}
-- Total Q3 2025: $${tQ3.toLocaleString()}
-- Total Q4 2025: $${tQ4.toLocaleString()}  
-- Total Q1 2026: $${tQ1.toLocaleString()} (quarter still in progress)
+- Total Q1 FY26: $${tQ3.toLocaleString()}
+- Total Q2 FY26: $${tQ4.toLocaleString()}  
+- Total Q3 FY26: $${tQ1.toLocaleString()} (quarter still in progress)
 - At Risk (declining, no deal activity): ${atRisk.length} accounts
 - Invoice Expected (declining but deal activity present): ${expected.length} accounts
 - Healthy (stable/growing): ${healthy.length} accounts
@@ -306,7 +306,7 @@ Focus on:
 4. A pattern or concentration risk the VP should be aware of
 5. One specific, actionable next step
 
-Be direct. Use actual company names and dollar figures. Don't hedge or be generic. Remember Q1 is mid-quarter so low Q1 numbers are expected — focus on accounts with ZERO deal pipeline as the real concerns.
+Be direct. Use actual company names and dollar figures. Don't hedge or be generic. Remember Q3 FY26 is mid-quarter so low Q3 numbers are expected — focus on accounts with ZERO deal pipeline as the real concerns.
 
 Respond with ONLY the JSON array, no markdown, no backticks, no other text.`;
 }
@@ -414,9 +414,9 @@ function badgeHTML(signal) {
 
 function miniBarHTML(d, maxVal) {
   const bars = [
-    {key:"q3",label:"Q3",color:"var(--q3)"},
-    {key:"q4",label:"Q4",color:"var(--q4)"},
-    {key:"q1",label:"Q1",color:"var(--q1)"},
+    {key:"q3",label:"Q1",color:"var(--q3)"},
+    {key:"q4",label:"Q2",color:"var(--q4)"},
+    {key:"q1",label:"Q3",color:"var(--q1)"},
   ];
   return `<div class="mini-bars">${bars.map(b => {
     const val = d[b.key];
@@ -453,13 +453,13 @@ function detailHTML(d) {
   const signal = getSignal(d);
   const total = d.q3+d.q4+d.q1;
   const maxQ = Math.max(d.q3,d.q4,d.q1);
-  const q3q4 = d.q3>0 ? (((d.q4-d.q3)/d.q3)*100).toFixed(1) : d.q4>0?"NEW":"0";
-  const q4q1 = d.q4>0 ? (((d.q1-d.q4)/d.q4)*100).toFixed(1) : d.q1>0?"NEW":"0";
+  const q1q2 = d.q3>0 ? (((d.q4-d.q3)/d.q3)*100).toFixed(1) : d.q4>0?"NEW":"0";
+  const q2q3 = d.q4>0 ? (((d.q1-d.q4)/d.q4)*100).toFixed(1) : d.q1>0?"NEW":"0";
 
   const quarters = [
-    {label:"Q3 2025",val:d.q3,color:"var(--q3)"},
-    {label:"Q4 2025",val:d.q4,color:"var(--q4)"},
-    {label:"Q1 2026",val:d.q1,color:"var(--q1)"},
+    {label:"Q1 FY26",val:d.q3,color:"var(--q3)"},
+    {label:"Q2 FY26",val:d.q4,color:"var(--q4)"},
+    {label:"Q3 FY26",val:d.q1,color:"var(--q1)"},
   ];
 
   function trendDisplay(pct) {
@@ -486,8 +486,8 @@ function detailHTML(d) {
     </div>
     <div class="detail-labels">${quarters.map(q=>`<span>${q.label}</span>`).join("")}</div>
     <div class="trend-row">
-      <div class="trend-box"><div class="trend-label">Q3 → Q4</div><div class="trend-val">${trendDisplay(q3q4)}</div></div>
-      <div class="trend-box"><div class="trend-label">Q4 → Q1</div><div class="trend-val">${trendDisplay(q4q1)}</div></div>
+      <div class="trend-box"><div class="trend-label">Q1 → Q2</div><div class="trend-val">${trendDisplay(q1q2)}</div></div>
+      <div class="trend-box"><div class="trend-label">Q2 → Q3</div><div class="trend-val">${trendDisplay(q2q3)}</div></div>
     </div>
     <div class="deal-box">
       <div class="deal-title">DEAL ACTIVITY</div>
@@ -503,9 +503,9 @@ function totalChartHTML(data) {
   const tQ1 = data.reduce((s,d)=>s+d.q1,0);
   const max = Math.max(tQ3,tQ4,tQ1);
   const quarters = [
-    {label:"Q3 2025",val:tQ3,color:"var(--q3)"},
-    {label:"Q4 2025",val:tQ4,color:"var(--q4)"},
-    {label:"Q1 2026",val:tQ1,color:"var(--q1)"},
+    {label:"Q1 FY26",val:tQ3,color:"var(--q3)"},
+    {label:"Q2 FY26",val:tQ4,color:"var(--q4)"},
+    {label:"Q3 FY26",val:tQ1,color:"var(--q1)"},
   ];
   return `<div class="chart-box">
     <div class="chart-title">Total Revenue by Quarter</div>
@@ -538,7 +538,7 @@ function render() {
         <span class="date-badge"><span class="dot">●</span>Last Updated: ${STATE.lastUpdated}</span>
       </div>
       <h1>Quarterly Invoice Trends</h1>
-      <p class="subtitle">Q3 2025 → Q4 2025 → Q1 2026 · Accounts under $1K excluded</p>
+      <p class="subtitle">Q1 FY26 → Q2 FY26 → Q3 FY26 · Accounts under $1K excluded</p>
     </div>
 
     <div class="scorecards">
@@ -598,7 +598,7 @@ function render() {
     </div>
 
     <div class="footer">
-      Data from HubSpot · Invoices synced since Jul 1, 2025 · Prepared by <a href="https://pivotslc.com" target="_blank">Pivot</a>
+      Data from HubSpot · Invoices synced since Q1 FY26 (Jul 2025) · Prepared by <a href="https://pivotslc.com" target="_blank">Pivot</a>
     </div>
   `;
 }
