@@ -23,6 +23,23 @@
   --q4: #a78bfa;
   --q1: #34d399;
 }
+[data-theme="light"] {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-hover: #f0f1f4;
+  --border: #dfe1e6;
+  --text: #1a1c23;
+  --text-muted: #5c6078;
+  --text-dim: #8b8fa3;
+  --green: #16a34a;
+  --red: #dc2626;
+  --amber: #d97706;
+  --blue: #2563eb;
+  --purple: #7c3aed;
+  --q3: #2563eb;
+  --q4: #7c3aed;
+  --q1: #16a34a;
+}
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:32px; }
 .loading { display:flex; align-items:center; justify-content:center; min-height:100vh; flex-direction:column; gap:8px; }
@@ -40,11 +57,8 @@ h1 { font-size:24px; font-weight:700; letter-spacing:-0.5px; }
 .scorecards { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px; }
 .scorecards-left { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .scorecard { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:20px 24px; }
-.scorecard.alert { border-color:rgba(248,113,113,0.25); background:rgba(248,113,113,0.08); }
 .scorecard.alert .sc-val { color:var(--red); }
-.scorecard.good { border-color:rgba(52,211,153,0.25); background:rgba(52,211,153,0.08); }
 .scorecard.good .sc-val { color:var(--green); }
-.scorecard.amber { border-color:rgba(251,191,36,0.25); background:rgba(251,191,36,0.08); }
 .scorecard.amber .sc-val { color:var(--amber); }
 .sc-label { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim); margin-bottom:8px; }
 .sc-val { font-size:26px; font-weight:700; letter-spacing:-0.5px; font-family:'JetBrains Mono',monospace; }
@@ -155,6 +169,22 @@ h1 { font-size:24px; font-weight:700; letter-spacing:-0.5px; }
 .footer { text-align:center; padding:24px 0 8px; font-size:10px; color:var(--text-dim); }
 .footer a { color:var(--text-muted); text-decoration:underline; }
 
+.theme-toggle { position:fixed; top:16px; right:16px; z-index:100; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:6px 10px; cursor:pointer; display:flex; align-items:center; gap:6px; font-family:'DM Sans',sans-serif; font-size:11px; font-weight:600; color:var(--text-muted); transition:all 0.2s; }
+.theme-toggle:hover { border-color:rgba(255,255,255,0.2); color:var(--text); }
+[data-theme="light"] .theme-toggle:hover { border-color:rgba(0,0,0,0.2); }
+[data-theme="light"] .insight-item { background:rgba(0,0,0,0.02); border-color:rgba(0,0,0,0.06); }
+[data-theme="light"] .insights-refresh:hover { border-color:rgba(0,0,0,0.2); }
+[data-theme="light"] .btn:hover { border-color:rgba(0,0,0,0.2); }
+[data-theme="light"] .btn.active { background:rgba(0,0,0,0.06); border-color:rgba(0,0,0,0.15); }
+[data-theme="light"] .mini-track { background:rgba(0,0,0,0.06); }
+[data-theme="light"] .trend-box { background:rgba(0,0,0,0.03); }
+[data-theme="light"] .deal-box { background:rgba(0,0,0,0.03); }
+.theme-toggle .icon { font-size:14px; line-height:1; }
+
+.scorecard.alert { border-color:color-mix(in srgb, var(--red) 25%, transparent); background:color-mix(in srgb, var(--red) 8%, transparent); }
+.scorecard.good { border-color:color-mix(in srgb, var(--green) 25%, transparent); background:color-mix(in srgb, var(--green) 8%, transparent); }
+.scorecard.amber { border-color:color-mix(in srgb, var(--amber) 25%, transparent); background:color-mix(in srgb, var(--amber) 8%, transparent); }
+
 @media(max-width:1100px) {
   .main-grid { grid-template-columns:1fr; }
   .detail { position:static; }
@@ -173,7 +203,32 @@ h1 { font-size:24px; font-weight:700; letter-spacing:-0.5px; }
   <p>Fetching data from Google Sheets</p>
 </div>
 
+<button class="theme-toggle" onclick="toggleTheme()">
+  <span class="icon" id="theme-icon">☀️</span>
+  <span id="theme-label">Light</span>
+</button>
+
 <script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') !== 'light';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('theme-icon').textContent = isDark ? '🌙' : '☀️';
+  document.getElementById('theme-label').textContent = isDark ? 'Dark' : 'Light';
+  localStorage.setItem('neovolta-theme', isDark ? 'light' : 'dark');
+}
+// Restore saved preference
+(function() {
+  const saved = localStorage.getItem('neovolta-theme');
+  if (saved === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('theme-icon').textContent = '🌙';
+      document.getElementById('theme-label').textContent = 'Dark';
+    });
+  }
+})();
+
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSIiOf5lYvr2kIR6aBr1ASJvEQBc-L6lMTUsx5iqznCSkh0Jlr3FOdJNt_DIPvlTpV0es1OdFBZ82V2/pub?gid=0&single=true&output=csv";
 
 // ⚡ CHANGE THIS to your Cloudflare Worker URL after deploying
